@@ -82,11 +82,38 @@ restore_single_database() {
     # Extract the database name from the backup file name
     DB_NAME=$(basename "$BACKUP_FILE_PATH" .backup | cut -d'_' -f1)
 
+    # Prompt user for the database name to restore to
+    read -p "Enter the database name to restore to (press enter for default: $DEFAULT_DB_NAME): " DB_NAME
+    DB_NAME=${DB_NAME:-$DEFAULT_DB_NAME}
+
     # Confirm before proceeding with the restore
     read -p "You selected to restore database $DB_NAME from $(basename "$BACKUP_FILE_PATH"). Do you want to continue? (y/n): " confirm
-    if [ "$confirm" != "y" ]; then
+    if [ "${$confirm,,}" != "y" ]; then
         echo "Restore operation aborted"
         exit 1
+    fi
+
+    # Check if the database already exists
+    echo "Checking if database $DB_NAME exists..."
+    if PGPASSWORD=$PASSWORD psql -h $HOST -p $PORT -U $USER -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
+        echo "Database $DB_NAME already exists."
+        read -p "Do you want to drop the existing database $DB_NAME before restoring? (y/n/abort): " drop_choice
+        if [[ "${drop_choice,,}" == "y" ]]; then
+            echo "Dropping existing database $DB_NAME..."
+            PGPASSWORD=$PASSWORD dropdb -h $HOST -p $PORT -U $USER $DB_NAME
+            if [ $? -ne 0 ]; then
+                echo "Failed to drop database $DB_NAME. Aborting restore operation."
+                exit 1
+            fi
+        elif [[ "${drop_choice,,}" == "abort" ]]; then
+            echo "Restore operation aborted"
+            exit 1
+        else
+            echo "Keeping existing database $DB_NAME"
+            return
+        fi
+    else
+        echo "Database $DB_NAME does not exist. It will be created."
     fi
 
     # Create the database if it doesn't exist
