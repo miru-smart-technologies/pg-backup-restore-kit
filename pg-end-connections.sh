@@ -1,38 +1,83 @@
 #!/bin/bash
 
 # Script to terminate all connections to a PostgreSQL database
-# Usage: ./pg-end-connections.sh <database_name> [host] [port] [username]
+# Usage: ./pg-end-connections.sh <database_name> [-h host] [-p port] [-u username]
 # 
 # Arguments:
 #   database_name - Name of the database to terminate connections for (required)
-#   host         - PostgreSQL server host (optional, defaults to localhost)
-#   port         - PostgreSQL server port (optional, defaults to 5432)
-#   username     - PostgreSQL username (optional, defaults to current user)
+#
+# Options:
+#   -h host      - PostgreSQL server host (default: localhost)
+#   -p port      - PostgreSQL server port (default: 5432)
+#   -u username  - PostgreSQL username (default: current user)
 #
 # Environment variables:
 #   PGPASSWORD   - PostgreSQL password (recommended for security)
 
-# Check if database name is provided
+# Set default values
+PG_HOST="localhost"
+PG_PORT="5432"
+PG_USER="$USER"
+
+# Function to display usage
+usage() {
+    echo "Usage: $0 <database_name> [-h host] [-p port] [-u username]"
+    echo ""
+    echo "Arguments:"
+    echo "  database_name - Name of the database to terminate connections for (required)"
+    echo ""
+    echo "Options:"
+    echo "  -h host      - PostgreSQL server host (default: localhost)"
+    echo "  -p port      - PostgreSQL server port (default: 5432)"
+    echo "  -u username  - PostgreSQL username (default: current user)"
+    echo ""
+    echo "Environment variables:"
+    echo "  PGPASSWORD   - PostgreSQL password (recommended for security)"
+    echo ""
+    echo "Examples:"
+    echo "  $0 mydatabase"
+    echo "  $0 mydatabase -h 192.168.1.100 -p 5433 -u postgres"
+    echo "  PGPASSWORD=mypass $0 mydatabase -h server.example.com -u dbuser"
+}
+
+# Check if at least one argument (database name) is provided
 if [ $# -eq 0 ]; then
     echo "Error: Database name is required"
-    echo "Usage: $0 <database_name> [host] [port] [username]"
     echo ""
-    echo "Optional parameters:"
-    echo "  host     - PostgreSQL server host (default: localhost)"
-    echo "  port     - PostgreSQL server port (default: 5432)"
-    echo "  username - PostgreSQL username (default: current user)"
-    echo ""
-    echo "Set PGPASSWORD environment variable for password authentication"
+    usage
     exit 1
 fi
 
 # Get the database name from the first argument
 DB_NAME="$1"
+shift  # Remove the database name from the argument list
 
-# Get optional connection parameters
-PG_HOST="${2:-localhost}"
-PG_PORT="${3:-5432}"
-PG_USER="${4:-$USER}"
+# Parse command line options
+while getopts "h:p:u:" opt; do
+    case $opt in
+        h)
+            PG_HOST="$OPTARG"
+            ;;
+        p)
+            PG_PORT="$OPTARG"
+            ;;
+        u)
+            PG_USER="$OPTARG"
+            ;;
+        \?)
+            echo "Invalid option: -$OPTARG" >&2
+            echo ""
+            usage
+            exit 1
+            ;;
+        :)
+            echo "Option -$OPTARG requires an argument." >&2
+            echo ""
+            usage
+            exit 1
+            ;;
+    esac
+done
 
 # Validate database name (basic check for empty string)
 if [ -z "$DB_NAME" ]; then
