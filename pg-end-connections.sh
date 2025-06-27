@@ -113,12 +113,29 @@ echo ""
 echo "Terminating all connections to database: $DB_NAME"
 
 # Execute the SQL command to terminate all connections to the specified database
-psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$DB_NAME" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$DB_NAME';"
+# Capture both stdout and stderr to analyze the response
+OUTPUT=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$DB_NAME" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$DB_NAME';" 2>&1)
+EXIT_CODE=$?
 
-# Check if the command was successful
-if [ $? -eq 0 ]; then
-    echo "Successfully terminated all connections to database: $DB_NAME"
+echo "PostgreSQL response:"
+echo "$OUTPUT"
+echo ""
+
+# Check if the response indicates successful termination
+# The "FATAL: terminating connection due to administrator command" message actually indicates success
+if echo "$OUTPUT" | grep -q "FATAL:.*terminating connection due to administrator command"; then
+    echo "✓ Successfully terminated all connections to database: $DB_NAME"
+    echo "  (Connection termination messages are expected and indicate success)"
+    exit 0
+elif echo "$OUTPUT" | grep -q "server closed the connection unexpectedly"; then
+    echo "✓ Successfully terminated all connections to database: $DB_NAME"
+    echo "  (Connection closed messages are expected and indicate success)"
+    exit 0
+elif [ $EXIT_CODE -eq 0 ] && echo "$OUTPUT" | grep -q "pg_terminate_backend"; then
+    echo "✓ Successfully terminated all connections to database: $DB_NAME"
+    exit 0
 else
-    echo "Error: Failed to terminate connections to database: $DB_NAME"
+    echo "✗ Error: Failed to terminate connections to database: $DB_NAME"
+    echo "  Exit code: $EXIT_CODE"
     exit 1
 fi
