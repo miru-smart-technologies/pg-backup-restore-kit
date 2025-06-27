@@ -102,7 +102,7 @@ restore_single_database() {
             echo "Dropping existing database $DB_NAME..."
             PGPASSWORD=$PASSWORD dropdb -h $HOST -p $PORT -U $USER $DB_NAME
             if [ $? -ne 0 ]; then
-                echo "Failed to drop database $DB_NAME. Aborting restore operation."
+                echo "Failed to drop database $DB_NAME. If the database still has active connections, run `pg-end-connections.sh` and then try again. Aborting restore operation."
                 exit 1
             fi
         elif [[ "${drop_choice,,}" == "abort" ]]; then
